@@ -48,6 +48,8 @@ export interface JanitorReport {
   cutoff: string;
   embyUsers: number;
   embyDatedPlays: number;
+  embyActivityPlays: number;
+  unmatchedActivityPlays: string[];
   totals: { series: number; movies: number };
   kept: Record<string, number>;
   candidates: CandidateRow[];
@@ -133,7 +135,7 @@ export class MediaJanitorService {
       : null;
 
     // Without watch data everything would look unwatched, so refuse to judge on a bad read.
-    const watch = await embyClient.getWatchIndex();
+    const watch = await embyClient.getWatchIndex(cutoff);
     if (watch.users === 0 || watch.datedPlays === 0) {
       throw new Error(`Emby watch data looks empty (users ${watch.users}, dated plays ${watch.datedPlays}); refusing to run`);
     }
@@ -226,6 +228,8 @@ export class MediaJanitorService {
       cutoff: cutoff.toISOString(),
       embyUsers: watch.users,
       embyDatedPlays: watch.datedPlays,
+      embyActivityPlays: watch.activityPlays,
+      unmatchedActivityPlays: [...new Set(watch.unmatchedActivityPlays)],
       totals: {
         series: titles.filter((t) => t.kind === 'series').length,
         movies: titles.filter((t) => t.kind === 'movie').length,

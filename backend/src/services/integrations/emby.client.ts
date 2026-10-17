@@ -18,6 +18,8 @@ export interface EmbyWatchIndex {
   favouriteMovieFolders: Set<string>;
   users: number;
   datedPlays: number;
+  activityPlays: number;
+  unmatchedActivityPlays: string[];
 }
 
 class EmbyClient {
@@ -148,8 +150,12 @@ class EmbyClient {
    * (any episode) or movie, keyed by TVDB / TMDB id and by folder name, plus anything a
    * user has favourited. Throws if any request fails, so callers never mistake missing
    * data for "nobody watched it".
+   *
+   * Two sources are combined, because each misses plays the other sees: per-user play data
+   * has no date for a short or abandoned play, and the activity log points at item ids that
+   * change when a file is replaced, so those entries are matched by title instead.
    */
-  async getWatchIndex(): Promise<EmbyWatchIndex> {
+  async getWatchIndex(since: Date): Promise<EmbyWatchIndex> {
     if (!this.isConfigured()) throw new Error('Emby is not configured');
     const headers = { 'X-Emby-Token': this.token! };
     const get = async <T>(path: string, params: Record<string, string>): Promise<T> => {
@@ -158,6 +164,7 @@ class EmbyClient {
     };
     type Item = {
       Id: string;
+      Name?: string;
       Type: string;
       SeriesId?: string;
       Path?: string;
@@ -176,6 +183,8 @@ class EmbyClient {
       favouriteMovieFolders: new Set(),
       users: 0,
       datedPlays: 0,
+      activityPlays: 0,
+      unmatchedActivityPlays: [],
     };
     const folderOf = (path?: string) => (path ? path.replace(/\/+$/, '').split('/').pop()!.toLowerCase() : undefined);
     const later = (map: Map<string, string>, key: string | undefined, date: string) => {
@@ -191,9 +200,29 @@ class EmbyClient {
       Fields: 'ProviderIds,Path',
     });
     const seriesKeys = new Map<string, { tvdb?: string; folder?: string }>();
+    const seriesByName = new Map<string, { tvdb?: string; folder?: string }>();
     for (const s of series.Items) {
-      seriesKeys.set(s.Id, { tvdb: s.ProviderIds?.Tvdb, folder: folderOf(s.Path) });
+      const keys = { tvdb: s.ProviderIds?.Tvdb, folder: folderOf(s.Path) };
+      seriesKeys.set(s.Id, keys);
+      if (s.Name) seriesByName.set(s.Name.toLowerCase(), keys);
     }
+    const movies = await get<{ Items: Item[] }>('/Items', {
+      Recursive: 'true',
+      IncludeItemTypes: 'Movie',
+      Fields: 'ProviderIds,Path',
+    });
+    const movieByName = new Map<string, { tmdb?: string; folder?: string }>();
+    for (const m of movies.Items) {
+      if (m.Name) movieByName.set(m.Name.toLowerCase(), { tmdb: m.ProviderIds?.Tmdb, folder: folderOf(m.Path?.replace(/\/[^/]+$/, '')) });
+    }
+    const markSeries = (keys: { tvdb?: string; folder?: string } | undefined, date: string) => {
+      later(index.seriesByTvdb, keys?.tvdb, date);
+      later(index.seriesByFolder, keys?.folder, date);
+    };
+    const markMovie = (keys: { tmdb?: string; folder?: string } | undefined, date: string) => {
+      later(index.moviesByTmdb, keys?.tmdb, date);
+      later(index.moviesByFolder, keys?.folder, date);
+    };
 
     const users = await get<Array<{ Id: string }>>('/Users', {});
     index.users = users.length;
@@ -211,12 +240,9 @@ class EmbyClient {
           if (!date) continue; // marked played by hand, never actually watched
           index.datedPlays++;
           if (item.Type === 'Episode' && item.SeriesId) {
-            const keys = seriesKeys.get(item.SeriesId);
-            later(index.seriesByTvdb, keys?.tvdb, date);
-            later(index.seriesByFolder, keys?.folder, date);
+            markSeries(seriesKeys.get(item.SeriesId), date);
           } else if (item.Type === 'Movie') {
-            later(index.moviesByTmdb, item.ProviderIds?.Tmdb, date);
-            later(index.moviesByFolder, folderOf(item.Path?.replace(/\/[^/]+$/, '')), date);
+            markMovie({ tmdb: item.ProviderIds?.Tmdb, folder: folderOf(item.Path?.replace(/\/[^/]+$/, '')) }, date);
           }
         }
       }
@@ -238,6 +264,63 @@ class EmbyClient {
           if (folder) index.favouriteMovieFolders.add(folder);
         }
       }
+    }
+
+    // Activity log, newest first: every playback start since the cutoff.
+    type Entry = { Type: string; ItemId?: string; Name: string; Date: string };
+    const plays: Entry[] = [];
+    for (let start = 0; ; ) {
+      const page = await get<{ Items: Entry[] }>('/System/ActivityLog/Entries', {
+        StartIndex: String(start),
+        Limit: '1000',
+      });
+      if (!page.Items.length) break;
+      let reachedCutoff = false;
+      for (const entry of page.Items) {
+        if (Date.parse(entry.Date) < since.getTime()) {
+          reachedCutoff = true;
+          break;
+        }
+        if (entry.Type === 'playback.start') plays.push(entry);
+      }
+      if (reachedCutoff) break;
+      start += page.Items.length;
+    }
+    index.activityPlays = plays.length;
+
+    const ids = [...new Set(plays.map((p) => p.ItemId).filter((id): id is string => !!id))];
+    const items = new Map<string, Item>();
+    for (let i = 0; i < ids.length; i += 100) {
+      const page = await get<{ Items: Item[] }>('/Items', {
+        Ids: ids.slice(i, i + 100).join(','),
+        Fields: 'ProviderIds,Path,SeriesId',
+      });
+      for (const item of page.Items) items.set(item.Id, item);
+    }
+    for (const play of plays) {
+      const item = play.ItemId ? items.get(play.ItemId) : undefined;
+      if (item?.Type === 'Episode' && item.SeriesId && seriesKeys.has(item.SeriesId)) {
+        markSeries(seriesKeys.get(item.SeriesId), play.Date);
+        continue;
+      }
+      if (item?.Type === 'Movie') {
+        markMovie({ tmdb: item.ProviderIds?.Tmdb, folder: folderOf(item.Path?.replace(/\/[^/]+$/, '')) }, play.Date);
+        continue;
+      }
+      // The item id no longer exists, so match the title in "<user> is playing <title> on <device>".
+      const what = play.Name.replace(/^.+? is playing /, '');
+      const episode = what.match(/^(.+?) - S\d+, Ep\d+/);
+      if (episode && seriesByName.has(episode[1].toLowerCase())) {
+        markSeries(seriesByName.get(episode[1].toLowerCase()), play.Date);
+        continue;
+      }
+      const onAt = what.lastIndexOf(' on ');
+      const movieName = (onAt > 0 ? what.slice(0, onAt) : what).toLowerCase();
+      if (!episode && movieByName.has(movieName)) {
+        markMovie(movieByName.get(movieName), play.Date);
+        continue;
+      }
+      index.unmatchedActivityPlays.push(play.Name);
     }
 
     return index;
