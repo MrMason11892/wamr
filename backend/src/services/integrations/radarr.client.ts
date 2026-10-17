@@ -31,6 +31,11 @@ interface RadarrMovie {
   genres?: string[];
   hasFile?: boolean;
   monitored?: boolean;
+  id?: number;
+  path?: string;
+  added?: string;
+  tags?: number[];
+  sizeOnDisk?: number;
 }
 
 interface RadarrSystemStatus {
@@ -157,6 +162,12 @@ export class RadarrClient {
     searchForMovie?: boolean;
   }): Promise<RadarrMovie> {
     try {
+      // A movie the media janitor removed sits on the import exclusions. Someone asking for it
+      // again is the signal it is wanted, so lift the exclusion before re-adding it.
+      await this.removeImportExclusion(params.tmdbId).catch((error) =>
+        logger.warn({ error, tmdbId: params.tmdbId }, 'Could not check exclusions before adding')
+      );
+
       const body = {
         title: params.title,
         year: params.year,
@@ -290,4 +301,49 @@ export class RadarrClient {
       throw error;
     }
   }
+
+  /**
+   * Remove a movie from the import exclusions, if it is on them.
+   * Returns true when an exclusion was removed.
+   */
+  async removeImportExclusion(tmdbId: number): Promise<boolean> {
+    const response = await this.client.get<Array<{ id: number; tmdbId: number }>>(
+      '/api/v3/exclusions'
+    );
+    const matches = response.data.filter((e) => e.tmdbId === tmdbId);
+    for (const exclusion of matches) {
+      await this.client.delete(`/api/v3/exclusions/${exclusion.id}`);
+    }
+    if (matches.length) logger.info({ tmdbId }, 'Removed Radarr import exclusion');
+    return matches.length > 0;
+  }
+
+  /**
+   * Delete a movie and its files, adding it to the import exclusions so import lists
+   * do not pull it straight back in.
+   */
+  async deleteMovieWithExclusion(id: number): Promise<void> {
+    await this.client.delete(`/api/v3/movie/${id}`, {
+      params: { deleteFiles: true, addImportExclusion: true },
+      timeout: 5 * 60_000,
+    });
+  }
+
+  /**
+   * Get tag labels by id
+   */
+  async getTags(): Promise<Array<{ id: number; label: string }>> {
+    const response = await this.client.get<Array<{ id: number; label: string }>>('/api/v3/tag');
+    return response.data;
+  }
+
+  /**
+   * Get all movies with a timeout long enough for a large library
+   */
+  async getAllMoviesForCleanup(): Promise<RadarrMovie[]> {
+    const response = await this.client.get<RadarrMovie[]>('/api/v3/movie', { timeout: 120_000 });
+    return response.data;
+  }
 }
+
+export type { RadarrMovie };

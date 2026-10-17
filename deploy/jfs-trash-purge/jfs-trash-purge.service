@@ -1,0 +1,10 @@
+[Unit]
+Description=Purge WAMR media janitor deletions from the JuiceFS trash
+After=jfs-telebox.service
+Requires=jfs-telebox.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/apps/wamr/deploy/jfs-trash-purge/jfs-trash-purge.py
+Nice=10
+IOSchedulingClass=idle

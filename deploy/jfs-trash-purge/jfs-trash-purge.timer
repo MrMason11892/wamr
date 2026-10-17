@@ -1,0 +1,9 @@
+[Unit]
+Description=Purge WAMR media janitor deletions from the JuiceFS trash every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

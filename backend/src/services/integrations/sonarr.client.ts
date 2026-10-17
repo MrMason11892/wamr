@@ -50,6 +50,10 @@ interface SonarrSeries {
   seriesType?: string;
   certification?: string;
   monitored?: boolean;
+  id?: number;
+  path?: string;
+  added?: string;
+  tags?: number[];
   statistics?: {
     seasonCount: number;
     episodeCount: number;
@@ -201,6 +205,12 @@ export class SonarrClient {
     searchForMissingEpisodes?: boolean;
   }): Promise<SonarrSeries> {
     try {
+      // A series the media janitor removed sits on the import list exclusions. Someone asking for
+      // it again is the signal it is wanted, so lift the exclusion before re-adding it.
+      await this.removeImportListExclusion(params.tvdbId).catch((error) =>
+        logger.warn({ error, tvdbId: params.tvdbId }, 'Could not check exclusions before adding')
+      );
+
       const body = {
         title: params.title,
         year: params.year,
@@ -395,4 +405,49 @@ export class SonarrClient {
       throw error;
     }
   }
+
+  /**
+   * Remove a series from the import list exclusions, if it is on them.
+   * Returns true when an exclusion was removed.
+   */
+  async removeImportListExclusion(tvdbId: number): Promise<boolean> {
+    const response = await this.client.get<Array<{ id: number; tvdbId: number }>>(
+      '/api/v3/importlistexclusion'
+    );
+    const matches = response.data.filter((e) => e.tvdbId === tvdbId);
+    for (const exclusion of matches) {
+      await this.client.delete(`/api/v3/importlistexclusion/${exclusion.id}`);
+    }
+    if (matches.length) logger.info({ tvdbId }, 'Removed Sonarr import list exclusion');
+    return matches.length > 0;
+  }
+
+  /**
+   * Delete a series and its files, adding it to the import list exclusions so import lists
+   * do not pull it straight back in.
+   */
+  async deleteSeriesWithExclusion(id: number): Promise<void> {
+    await this.client.delete(`/api/v3/series/${id}`, {
+      params: { deleteFiles: true, addImportListExclusion: true },
+      timeout: 10 * 60_000, // deleting a large series on the JuiceFS mount is slow
+    });
+  }
+
+  /**
+   * Get tag labels by id
+   */
+  async getTags(): Promise<Array<{ id: number; label: string }>> {
+    const response = await this.client.get<Array<{ id: number; label: string }>>('/api/v3/tag');
+    return response.data;
+  }
+
+  /**
+   * Get all series with a timeout long enough for a large library
+   */
+  async getAllSeriesForCleanup(): Promise<SonarrSeries[]> {
+    const response = await this.client.get<SonarrSeries[]>('/api/v3/series', { timeout: 120_000 });
+    return response.data;
+  }
 }
+
+export type { SonarrSeries };

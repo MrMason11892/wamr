@@ -59,6 +59,13 @@ const envSchema = z.object({
   EMBY_URL: z.string().optional(),
   EMBY_TOKEN: z.string().optional(),
 
+  // Media janitor: removes titles nobody has watched for JANITOR_DAYS (report only by default)
+  JANITOR_ENABLED: z.string().default('true').transform((v) => v !== 'false'),
+  JANITOR_MODE: z.enum(['report', 'delete']).default('report'),
+  JANITOR_DAYS: z.string().transform(Number).pipe(z.number().min(30)).default('90'),
+  JANITOR_MAX_PER_RUN: z.string().transform(Number).pipe(z.number().min(1)).default('100'),
+  JANITOR_HOUR: z.string().transform(Number).pipe(z.number().min(0).max(23)).default('4'),
+
   // Broadcast
   BROADCAST_DEFAULT_THROTTLE_MS: z.string().transform(Number).default('2500'),
   BROADCAST_DEFAULT_JITTER_MS: z.string().transform(Number).default('500'),

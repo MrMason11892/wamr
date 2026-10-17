@@ -27,6 +27,7 @@ import { whatsappSessionService } from './services/whatsapp/whatsapp-session.ser
 import { messageHandlerService } from './services/whatsapp/message-handler.service';
 import { mediaMonitoringService } from './services/media-monitoring/media-monitoring.service';
 import { broadcastSchedulerService } from './services/broadcast/broadcast-scheduler.service';
+import { mediaJanitorService } from './services/media-janitor/media-janitor.service';
 import { conversationSessionRepository } from './repositories/conversation-session.repository';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -190,6 +191,9 @@ async function startServer(): Promise<HttpServer> {
     logger.info('Starting broadcast scheduler');
     broadcastSchedulerService.start();
 
+    // Start media janitor (daily unwatched-title cleanup, report only unless JANITOR_MODE=delete)
+    mediaJanitorService.start();
+
     // Periodically clean up expired conversation sessions (every hour)
     setInterval(
       () => {
@@ -236,6 +240,7 @@ function setupGracefulShutdown(httpServer: HttpServer): void {
       // Stop media monitoring service
       logger.info('Stopping media monitoring service');
       mediaMonitoringService.stop();
+      mediaJanitorService.stop();
 
       // Close WhatsApp connection
       await whatsappClientService.disconnect();
