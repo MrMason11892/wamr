@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError, ZodEffects } from 'zod';
+import { ZodError, type ZodType } from 'zod';
 import { ErrorCodes, HttpStatus } from '../../utils/error-codes';
 import { logger } from '../../config/logger';
 
@@ -11,7 +11,7 @@ type ValidationTarget = 'body' | 'query' | 'params';
 /**
  * Accepted schema types
  */
-type ZodSchema = AnyZodObject | ZodEffects<any>;
+type ZodSchema = ZodType;
 
 /**
  * Create validation middleware using Zod schema
@@ -35,7 +35,7 @@ export function validate(schema: ZodSchema, target: ValidationTarget = 'body') {
     } catch (error) {
       if (error instanceof ZodError) {
         // Format Zod validation errors
-        const errors = error.errors.map((err) => ({
+        const errors = error.issues.map((err) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -81,7 +81,7 @@ export function validateMultiple(schemas: {
         } catch (error) {
           if (error instanceof ZodError) {
             errors.push(
-              ...error.errors.map((err) => ({
+              ...error.issues.map((err) => ({
                 field: `body.${err.path.join('.')}`,
                 message: err.message,
               }))
@@ -93,11 +93,11 @@ export function validateMultiple(schemas: {
       // Validate query
       if (schemas.query) {
         try {
-          req.query = await schemas.query.parseAsync(req.query);
+          req.query = (await schemas.query.parseAsync(req.query)) as Request['query'];
         } catch (error) {
           if (error instanceof ZodError) {
             errors.push(
-              ...error.errors.map((err) => ({
+              ...error.issues.map((err) => ({
                 field: `query.${err.path.join('.')}`,
                 message: err.message,
               }))
@@ -109,11 +109,11 @@ export function validateMultiple(schemas: {
       // Validate params
       if (schemas.params) {
         try {
-          req.params = await schemas.params.parseAsync(req.params);
+          req.params = (await schemas.params.parseAsync(req.params)) as Request['params'];
         } catch (error) {
           if (error instanceof ZodError) {
             errors.push(
-              ...error.errors.map((err) => ({
+              ...error.issues.map((err) => ({
                 field: `params.${err.path.join('.')}`,
                 message: err.message,
               }))

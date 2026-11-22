@@ -32,7 +32,7 @@ dotenv.config({ path: envPath });
 const envSchema = z.object({
   // Server
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3000'),
+  PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).prefault('3000'),
 
   // Database
   DATABASE_PATH: z.string().default('./data/wamr.db'),
@@ -45,15 +45,15 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 
   // Rate Limiting
-  RATE_LIMIT_WINDOW_MS: z.string().transform(Number).default('900000'), // 15 minutes
-  RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).default('100'),
-  LOGIN_RATE_LIMIT_MAX: z.string().transform(Number).default('5'),
+  RATE_LIMIT_WINDOW_MS: z.string().transform(Number).prefault('900000'), // 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).prefault('100'),
+  LOGIN_RATE_LIMIT_MAX: z.string().transform(Number).prefault('5'),
 
   // WhatsApp
   WHATSAPP_SESSION_PATH: z.string().default('./.baileys_auth'),
 
   // Media Monitoring
-  MEDIA_MONITORING_INTERVAL_MS: z.string().transform(Number).default('300000'), // 5 minutes default
+  MEDIA_MONITORING_INTERVAL_MS: z.string().transform(Number).prefault('300000'), // 5 minutes default
 
   // Emby - used to verify that completed media is visible before notifying users
   EMBY_URL: z.string().optional(),
@@ -62,21 +62,21 @@ const envSchema = z.object({
   // Media janitor: removes titles nobody has watched for JANITOR_DAYS (report only by default)
   JANITOR_ENABLED: z.string().default('true').transform((v) => v !== 'false'),
   JANITOR_MODE: z.enum(['report', 'delete']).default('report'),
-  JANITOR_DAYS: z.string().transform(Number).pipe(z.number().min(30)).default('90'),
-  JANITOR_MAX_PER_RUN: z.string().transform(Number).pipe(z.number().min(1)).default('100'),
-  JANITOR_HOUR: z.string().transform(Number).pipe(z.number().min(0).max(23)).default('4'),
+  JANITOR_DAYS: z.string().transform(Number).pipe(z.number().min(30)).prefault('90'),
+  JANITOR_MAX_PER_RUN: z.string().transform(Number).pipe(z.number().min(1)).prefault('100'),
+  JANITOR_HOUR: z.string().transform(Number).pipe(z.number().min(0).max(23)).prefault('4'),
 
   // Broadcast
-  BROADCAST_DEFAULT_THROTTLE_MS: z.string().transform(Number).default('2500'),
-  BROADCAST_DEFAULT_JITTER_MS: z.string().transform(Number).default('500'),
-  BROADCAST_TICKER_INTERVAL_MS: z.string().transform(Number).default('20000'),
+  BROADCAST_DEFAULT_THROTTLE_MS: z.string().transform(Number).prefault('2500'),
+  BROADCAST_DEFAULT_JITTER_MS: z.string().transform(Number).prefault('500'),
+  BROADCAST_TICKER_INTERVAL_MS: z.string().transform(Number).prefault('20000'),
 
   // Logging
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   LOG_PRETTY: z
     .string()
     .transform((val) => val === 'true')
-    .default('true'),
+    .prefault('true'),
 });
 
 // Parse and validate environment variables
@@ -85,7 +85,7 @@ function validateEnv() {
     return envSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors.map((err) => `${err.path.join('.')}: ${err.message}`);
+      const missingVars = error.issues.map((err) => `${err.path.join('.')}: ${err.message}`);
       console.error('❌ Environment validation failed:');
       missingVars.forEach((msg) => console.error(`  - ${msg}`));
       console.error('\n💡 Please check your .env file and ensure all required variables are set.');

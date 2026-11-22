@@ -225,7 +225,7 @@ export const updateMessageFilter = async (
       res.status(400).json({
         success: false,
         message: 'Invalid filter configuration',
-        errors: result.error.errors,
+        errors: result.error.issues,
       });
       return;
     }

@@ -3,7 +3,7 @@ import * as esbuild from 'esbuild';
 const sharedConfig = {
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node24',
   format: 'esm',
   sourcemap: true,
   external: [

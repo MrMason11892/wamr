@@ -106,11 +106,8 @@ describe('Error Handler Middleware', () => {
           requestId: 'test-request-id-123',
           method: 'GET',
           path: '/api/test',
-          error: {
-            name: 'ZodError',
-            message: expect.any(String),
-            stack: expect.any(String),
-          },
+          // zod 4 errors carry no stack trace
+          error: expect.objectContaining({ name: 'ZodError', message: expect.any(String) }),
           errors: [
             {
               field: 'name',

@@ -372,7 +372,7 @@ describe('WhatsApp Controller', () => {
 
       (messageFilterSchema.safeParse as Mock).mockReturnValue({
         success: false,
-        error: { errors: [{ message: 'Invalid filter type' }] },
+        error: { issues: [{ message: 'Invalid filter type' }] },
       });
 
       await updateMessageFilter(mockRequest as Request, mockResponse as Response, mockNext);

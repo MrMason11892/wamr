@@ -17,10 +17,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.join(
-  __dirname,
-  '../../node_modules/@whiskeysockets/baileys/lib/Socket/messages-recv.js'
-);
+// Baileys sits in backend/node_modules for a standalone install (Docker) and is
+// hoisted to the repo root node_modules in the workspace dev setup.
+const target = '@whiskeysockets/baileys/lib/Socket/messages-recv.js';
+const filePath =
+  [path.join(__dirname, '../node_modules', target), path.join(__dirname, '../../node_modules', target)].find((p) =>
+    fs.existsSync(p)
+  ) || path.join(__dirname, '../node_modules', target);
 
 if (!fs.existsSync(filePath)) {
   console.log('Baileys not installed yet, skipping patch');

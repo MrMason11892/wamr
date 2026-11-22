@@ -86,16 +86,16 @@ describe('Validation Middleware', () => {
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
         details: [
-          { field: 'name', message: 'String must contain at least 1 character(s)' },
-          { field: 'age', message: 'Number must be greater than or equal to 0' },
+          { field: 'name', message: 'Too small: expected string to have >=1 characters' },
+          { field: 'age', message: 'Too small: expected number to be >=0' },
         ],
       });
       expect(mockNext).not.toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalledWith(
         {
           errors: [
-            { field: 'name', message: 'String must contain at least 1 character(s)' },
-            { field: 'age', message: 'Number must be greater than or equal to 0' },
+            { field: 'name', message: 'Too small: expected string to have >=1 characters' },
+            { field: 'age', message: 'Too small: expected number to be >=0' },
           ],
           target: 'body',
         },
@@ -199,11 +199,11 @@ describe('Validation Middleware', () => {
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: [{ field: 'body.name', message: 'String must contain at least 1 character(s)' }],
+        details: [{ field: 'body.name', message: 'Too small: expected string to have >=1 characters' }],
       });
       expect(logger.warn).toHaveBeenCalledWith(
         {
-          errors: [{ field: 'body.name', message: 'String must contain at least 1 character(s)' }],
+          errors: [{ field: 'body.name', message: 'Too small: expected string to have >=1 characters' }],
         },
         'Multi-target validation failed'
       );
@@ -223,7 +223,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: [{ field: 'query.limit', message: 'Number must be greater than or equal to 1' }],
+        details: [{ field: 'query.limit', message: 'Too small: expected number to be >=1' }],
       });
     });
 
@@ -244,9 +244,9 @@ describe('Validation Middleware', () => {
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
         details: expect.arrayContaining([
-          { field: 'body.name', message: 'String must contain at least 1 character(s)' },
-          { field: 'query.limit', message: 'Number must be less than or equal to 100' },
-          { field: 'params.id', message: 'Invalid uuid' },
+          { field: 'body.name', message: 'Too small: expected string to have >=1 characters' },
+          { field: 'query.limit', message: 'Too big: expected number to be <=100' },
+          { field: 'params.id', message: 'Invalid UUID' },
         ]),
       });
     });
@@ -280,11 +280,11 @@ describe('Validation Middleware', () => {
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: [{ field: 'body.name', message: 'String must contain at least 1 character(s)' }],
+        details: [{ field: 'body.name', message: 'Too small: expected string to have >=1 characters' }],
       });
       expect(logger.warn).toHaveBeenCalledWith(
         {
-          errors: [{ field: 'body.name', message: 'String must contain at least 1 character(s)' }],
+          errors: [{ field: 'body.name', message: 'Too small: expected string to have >=1 characters' }],
         },
         'Multi-target validation failed'
       );
@@ -304,7 +304,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: [{ field: 'query.limit', message: 'Number must be greater than or equal to 1' }],
+        details: [{ field: 'query.limit', message: 'Too small: expected number to be >=1' }],
       });
     });
 
@@ -320,7 +320,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: [{ field: 'params.id', message: 'Invalid uuid' }],
+        details: [{ field: 'params.id', message: 'Invalid UUID' }],
       });
     });
 
@@ -341,9 +341,9 @@ describe('Validation Middleware', () => {
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
         details: expect.arrayContaining([
-          { field: 'body.name', message: 'String must contain at least 1 character(s)' },
-          { field: 'query.limit', message: 'Number must be less than or equal to 100' },
-          { field: 'params.id', message: 'Invalid uuid' },
+          { field: 'body.name', message: 'Too small: expected string to have >=1 characters' },
+          { field: 'query.limit', message: 'Too big: expected number to be <=100' },
+          { field: 'params.id', message: 'Invalid UUID' },
         ]),
       });
     });
