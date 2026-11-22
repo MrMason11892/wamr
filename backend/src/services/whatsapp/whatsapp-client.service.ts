@@ -17,6 +17,7 @@ import { whatsappConnectionRepository } from '../../repositories/whatsapp-connec
 import type { WhatsAppConnectionStatus } from '../../models/whatsapp-connection.model.js';
 import { messageFilterService } from './message-filter.service.js';
 import { resolveWAVersion, invalidateWAVersionCache } from './wa-version.service.js';
+import { clearSessionFiles } from './session-files.js';
 
 /**
  * Baileys message type (simplified for our use case)
@@ -417,9 +418,8 @@ export class WhatsAppClientService {
 
             // Clear stale session files so next init generates a fresh QR code
             try {
-              const fs = await import('fs/promises');
               const sessionPath = env.WHATSAPP_SESSION_PATH;
-              await fs.rm(sessionPath, { recursive: true, force: true });
+              await clearSessionFiles(sessionPath);
               logger.info({ sessionPath }, 'Cleared stale session files after logout');
             } catch (err) {
               logger.warn({ err }, 'Failed to clear session files after logout');
@@ -805,10 +805,9 @@ export class WhatsAppClientService {
 
       // Delete session files
       const sessionPath = env.WHATSAPP_SESSION_PATH;
-      const fs = await import('fs/promises');
 
       try {
-        await fs.rm(sessionPath, { recursive: true, force: true });
+        await clearSessionFiles(sessionPath);
         logger.info({ sessionPath }, 'Deleted failed session directory');
       } catch (err) {
         logger.warn({ err, sessionPath }, 'Failed to delete session directory (may not exist)');
@@ -850,7 +849,6 @@ export class WhatsAppClientService {
 
       // Then delete session files
       const sessionPath = env.WHATSAPP_SESSION_PATH;
-      const fs = await import('fs/promises');
 
       // Try multiple times with exponential backoff if busy
       let attempts = 0;
@@ -858,7 +856,7 @@ export class WhatsAppClientService {
 
       while (attempts < maxAttempts) {
         try {
-          await fs.rm(sessionPath, { recursive: true, force: true });
+          await clearSessionFiles(sessionPath);
           logger.info('WhatsApp session files deleted after logout');
           break;
         } catch (err: any) {
@@ -976,10 +974,9 @@ export class WhatsAppClientService {
 
       // Delete session files
       const sessionPath = env.WHATSAPP_SESSION_PATH;
-      const fs = await import('fs/promises');
 
       try {
-        await fs.rm(sessionPath, { recursive: true, force: true });
+        await clearSessionFiles(sessionPath);
         logger.info({ sessionPath }, 'Deleted WhatsApp session directory');
       } catch (err) {
         logger.warn({ err, sessionPath }, 'Failed to delete session directory (may not exist)');

@@ -4,6 +4,7 @@ import { logger } from '../../config/logger.js';
 import { env } from '../../config/environment.js';
 import { whatsappClientService } from './whatsapp-client.service.js';
 import { whatsappConnectionRepository } from '../../repositories/whatsapp-connection.repository.js';
+import { clearSessionFiles } from './session-files.js';
 
 /**
  * WhatsApp session initialization service
@@ -143,15 +144,8 @@ class WhatsAppSessionService {
    */
   async clearSession(): Promise<void> {
     try {
-      if (fs.existsSync(this.sessionPath)) {
-        // Remove all files in session directory
-        const files = fs.readdirSync(this.sessionPath);
-        for (const file of files) {
-          const filePath = path.join(this.sessionPath, file);
-          fs.rmSync(filePath, { recursive: true, force: true });
-        }
-        logger.info('Cleared WhatsApp session data');
-      }
+      await clearSessionFiles(this.sessionPath);
+      logger.info('Cleared WhatsApp session data');
     } catch (error) {
       logger.error({ error }, 'Failed to clear session data');
       throw error;
